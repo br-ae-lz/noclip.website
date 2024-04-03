@@ -4,9 +4,10 @@ import { GfxDevice } from "../gfx/platform/GfxPlatform.js";
 import { FakeTextureHolder } from "../TextureHolder.js";
 import { ViewerRenderInput, SceneGfx } from "../viewer.js";
 import ArrayBufferSlice from "../ArrayBufferSlice.js";
+import { NamedArrayBufferSlice } from "../DataFetcher.js";
 import { makeBackbufferDescSimple, pushAntialiasingPostProcessPass, standardFullClearRenderPassDescriptor } from "../gfx/helpers/RenderGraphHelpers.js";
 import { assertExists } from "../util.js";
-import { parseNSBMD } from "./NNS_G3D.js";
+import { parseNSBMD, parseNSBTX, BMD0} from "./NNS_G3D.js";
 import { NITRO_Program } from "../SuperMario64DS/render.js";
 import { fillMatrix4x4 } from "../gfx/helpers/UniformBufferHelpers.js";
 import { GfxrAttachmentSlot } from "../gfx/render/GfxRenderGraph.js";
@@ -81,17 +82,39 @@ class BasicNSBMDRenderer implements SceneGfx {
 }
 
 export function createBasicNSBMDRendererFromNSBMD(device: GfxDevice, buffer: ArrayBufferSlice) {
-    const textureHolder = new FakeTextureHolder([]);
-    const renderer = new BasicNSBMDRenderer(device, textureHolder);
-
     const bmd = parseNSBMD(buffer);
-    for (let i = 0; i < bmd.models.length; i++) {
-        const mdl0 = bmd.models[0];
-        const mdl0Renderer = new MDL0Renderer(renderer.getCache(), mdl0, assertExists(bmd.tex0));
-        for (let j = 0; j < mdl0Renderer.viewerTextures.length; j++)
-            textureHolder.viewerTextures.push(mdl0Renderer.viewerTextures[j]);
-        renderer.mdl0Renderers.push(mdl0Renderer);
-    }
+	return createBasicNSBMDRendererFromBMD0(device, bmd);
+}
 
-    return renderer;
+export function createBasicNSBMDRendererFromBuffers(device: GfxDevice, buffers: NamedArrayBufferSlice[]) {
+	// Expect .nsbmd and .nsbtx
+	if (buffers.length !== 2) return null;
+	let [nsbmdBuf, nsbtxBuf] = buffers;
+	
+	// Fix order
+	if (nsbtxBuf.name.endsWith(".nsbmd")) 
+		[nsbmdBuf, nsbtxBuf] = [nsbtxBuf, nsbmdBuf];
+
+	// If textures exist in NSBMD, prefer those
+	const bmd = parseNSBMD(nsbmdBuf);
+	if (bmd.tex0 !== null) 
+		throw "try only dropping the .nsbmd"
+
+	bmd.tex0 = parseNSBTX(nsbtxBuf).tex0;
+	return createBasicNSBMDRendererFromBMD0(device, bmd);
+}
+
+function createBasicNSBMDRendererFromBMD0(device: GfxDevice, bmd: BMD0) {
+	const textureHolder = new FakeTextureHolder([]);
+	const renderer = new BasicNSBMDRenderer(device, textureHolder);
+	
+	for (let i = 0; i < bmd.models.length; i++) {
+		const mdl0 = bmd.models[0];
+		const mdl0Renderer = new MDL0Renderer(renderer.getCache(), mdl0, assertExists(bmd.tex0))
+		for (let j = 0; j < mdl0Renderer.viewerTextures.length; j++)
+			textureHolder.viewerTextures.push(mdl0Renderer.viewerTextures[j]);
+		renderer.mdl0Renderers.push(mdl0Renderer);
+	}
+
+	return renderer;
 }

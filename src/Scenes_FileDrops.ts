@@ -95,7 +95,7 @@ export async function createSceneFromFiles(context: SceneContext, buffers: Named
     if (buffer.name.endsWith('.rarc') || buffer.name.endsWith('.bmd') || buffer.name.endsWith('.bdl'))
         return J3D.createSceneFromBuffer(context, buffer);
 
-    if (buffer.name.endsWith('.nsbmd'))
+    if (buffer.name.endsWith('.nsbmd') && buffers.length === 1)
         return NNS_G3D.createBasicNSBMDRendererFromNSBMD(device, buffer);
 
     if (buffers.length === 2 && buffers[0].name === 'd' && buffers[1].name === 't')
@@ -110,6 +110,11 @@ export async function createSceneFromFiles(context: SceneContext, buffers: Named
     const superMonkeyBallRenderer = SuperMonkeyBall.createSceneFromNamedBuffers(context, buffers);
     if (superMonkeyBallRenderer !== null) {
         return superMonkeyBallRenderer;
+    }
+
+	const NSBMDRenderer = NNS_G3D.createBasicNSBMDRendererFromBuffers(device, buffers);
+    if (NSBMDRenderer !== null) {
+        return NSBMDRenderer;
     }
 
     throw "whoops";
